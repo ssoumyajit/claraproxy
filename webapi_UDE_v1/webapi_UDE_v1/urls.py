@@ -23,6 +23,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.renderers import TemplateHTMLRenderer
+from rest_framework.parsers import JSONParser, MultiPartParser
+from rest_framework.decorators import parser_classes
 
 class UDEUpload(models.Model):
     img = models.FileField(upload_to="dicom_files/")
@@ -50,6 +52,9 @@ class UDEUploadSerilaizer(serializers.Serializer):
 @csrf_exempt
 def UDEFile_list(request):
     """
+    Django request class extends HttpRequest class & provides more flexible 
+    request parsing.
+
     List all upload files, or create a new file.
     """
     renderer_classes = [TemplateHTMLRenderer]
@@ -67,9 +72,48 @@ def UDEFile_list(request):
             return JsonResponse(serializer.data, status = 201)
         return JsonResponse(serializer.errors, status = 400)
 
+
+
+#------------------------------------------------------------------------------
+
+class ModelConfigUpload(models.Model):
+    model = models.FileField(upload_to="model_files/")
+    config = models.FileField(upload_to="config_files/")
+
+class ModelConfigSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    model = serializers.FileField()
+    config = serializers.FileField()
+
+    def create(self, validated_data):
+        """
+        create and return a new ModelConfig instance, given the validated data
+        """
+        return ModelConfig.objects.create(**validated_data)
+
+@csrf_exempt
+@parser_classes([MultiPartParser])
+def ModelConfigList(request):
+    #parser_classes = [MultiPartParser]
+
+    if request.method == 'GET':
+        modelconfigs = ModelConfigUpload.objects.all()
+        serializer = ModelConfigSerializer(modelconfigs, many = True, context={'request': request})
+        return JsonResponse(serializer.data, safe = False)
+    
+    elif request.method == 'POST':
+        data = MultiPartParser().parse(request)
+        serilaizer = ModelConfigSerializer(data=data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse(serializer.data, status=201)
+        return JsonResponse(serializer.errors, status=400)
+
+
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/v1/udeuploads/', UDEFile_list)
+    path('api/v1/udeuploads/', UDEFile_list),
+    path('api/v1/model_config_uploads/', ModelConfigList)
 ]
 
 if settings.DEBUG:
