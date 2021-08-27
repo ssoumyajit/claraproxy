@@ -29,17 +29,30 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework_proxy.views import ProxyView
 # from drfreverseproxy import ProxyView
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework import generics
 
 
 class UDEUpload(models.Model):
-    # img = models.FileField(upload_to="dicom_files/")
-    img = models.CharField(max_length=256, default="")
+    img = models.FileField(upload_to="dicom_files/")
+    # img = models.CharField(max_length=256, default="")
+
+
+class UDEUploadSerializerClass(serializers.ModelSerializer):
+
+    class Meta:
+        model = UDEUpload
+        fields = "__all__"
+
+
+class UDEUploadView(generics.CreateAPIView):
+    serializer_class = UDEUploadSerializerClass
 
 
 class UDEUploadSerilaizer(serializers.Serializer):
     id = serializers.IntegerField(read_only=True)
-    # img = serializers.FileField()
-    img = serializers.CharField()
+    img = serializers.FileField()
+    # img = serializers.CharField()
 
     def create(self, validated_data):
         """
@@ -58,7 +71,8 @@ class UDEUploadSerilaizer(serializers.Serializer):
 
 @csrf_exempt
 @api_view(['GET', 'POST'])
-def UDEFile_list(request):
+@parser_classes([MultiPartParser, FormParser])
+def UDEFile_list(request,):
     """
     Django request class extends HttpRequest class & provides more flexible 
     request parsing.
@@ -96,6 +110,10 @@ def UDEFile(request):
         files = UDEUpload.objects.all()
         serializer = UDEUploadSerilaizer(files, many=True)
         return Response(serializer.data)
+
+
+
+
 # ------------------------------------------------------------------------------
 
 
