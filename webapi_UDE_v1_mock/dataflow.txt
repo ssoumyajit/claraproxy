@@ -1,0 +1,5 @@
+
+ebmodel frontend ----> api/ebmodel -----> AIAA 
+                      {model image       
+                       config.json
+                       transform.json}
