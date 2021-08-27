@@ -25,14 +25,21 @@ from django.conf.urls.static import static
 from rest_framework.renderers import TemplateHTMLRenderer
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.decorators import parser_classes
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework_proxy.views import ProxyView
+# from drfreverseproxy import ProxyView
+
 
 class UDEUpload(models.Model):
-    img = models.FileField(upload_to="dicom_files/")
+    # img = models.FileField(upload_to="dicom_files/")
+    img = models.CharField(max_length=256, default="")
 
 
 class UDEUploadSerilaizer(serializers.Serializer):
     id = serializers.IntegerField(read_only=True)
-    img = serializers.FileField()
+    # img = serializers.FileField()
+    img = serializers.CharField()
 
     def create(self, validated_data):
         """
@@ -44,12 +51,13 @@ class UDEUploadSerilaizer(serializers.Serializer):
         """
         Update and returns an existing "UDEUpload" instance, given the validated_data.
         """
-        instance.img =validated_data.get('img', instance.img1)
+        instance.img=validated_data.get('img', instance.img)
         instance.save()
         return instance
 
 
 @csrf_exempt
+@api_view(['GET', 'POST'])
 def UDEFile_list(request):
     """
     Django request class extends HttpRequest class & provides more flexible 
@@ -61,24 +69,40 @@ def UDEFile_list(request):
 
     if request.method == 'GET':
         files = UDEUpload.objects.all()
-        serializer = UDEUploadSerilaizer(files, many = True)
-        return JsonResponse(serializer.data, safe=False)
+        serializer = UDEUploadSerilaizer(files, many=True)
+        return Response(serializer.data)
     
     elif request.method == 'POST':
-        data = JSONParser().parse(request)
-        serializer = UDEUploadSerilaizer(data = data)
+        # data = MultiPartParser().parse(request)
+        serializer = UDEUploadSerilaizer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return JsonResponse(serializer.data, status = 201)
-        return JsonResponse(serializer.errors, status = 400)
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
 
 
+@csrf_exempt
+@api_view(['GET'])
+def UDEFile(request):
+    """
+    Django request class extends HttpRequest class & provides more flexible
+    request parsing.
 
-#------------------------------------------------------------------------------
+    List all upload files, or create a new file.
+    """
+    renderer_classes = [TemplateHTMLRenderer]
+
+    if request.method == 'GET':
+        files = UDEUpload.objects.all()
+        serializer = UDEUploadSerilaizer(files, many=True)
+        return Response(serializer.data)
+# ------------------------------------------------------------------------------
+
 
 class ModelConfigUpload(models.Model):
     model = models.FileField(upload_to="model_files/")
     config = models.FileField(upload_to="config_files/")
+
 
 class ModelConfigSerializer(serializers.Serializer):
     id = serializers.IntegerField(read_only=True)
@@ -112,9 +136,12 @@ def ModelConfigList(request):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/v1/udeuploads/', UDEFile_list),
-    path('api/v1/model_config_uploads/', ModelConfigList)
+    # path('api/v1/udeuploads/', UDEFile),
+    # path('api/v1/model_config_uploads/', ModelConfigList),
+    path('api/v1/udeuploads/', ProxyView.as_view(source='api/v1/udeuploads/'), name='a_name')
+    # path('api/v1/udeuploads/', ProxyView.as_view(upstream='http://localhost:8080/api/v1/udeuploads/'))
+    # somewhere in A to somewhere in B
 ]
 
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root = settings.MEDIA_ROOT)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
